@@ -1,0 +1,81 @@
+from io import BytesIO
+
+import numpy as np
+import cv2
+from aiogram import Router, F
+from aiogram.types import Message
+from sqlalchemy import select
+
+from src.database import AsyncSessionLocal
+from src.models.user import User
+from src.keyboards.admin_kb import admin_user_actions_kb
+
+router = Router()
+
+
+@router.message(F.photo)
+async def scan_qr_code(message: Message):
+    # --- проверяем, что это админ ---
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(
+            select(User).where(User.telegram_id == message.from_user.id)
+        )
+        admin = result.scalar_one_or_none()
+
+    if not admin or admin.role != "admin":
+        return  # игнорируем, если не админ
+
+    # --- берём самое большое фото ---
+    photo = message.photo[-1]
+
+    bio = BytesIO()
+    await message.bot.download(photo, destination=bio)
+    bio.seek(0)
+
+    # --- читаем картинку в OpenCV ---
+    file_bytes = np.asarray(bytearray(bio.read()), dtype=np.uint8)
+    img = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
+
+    detector = cv2.QRCodeDetector()
+    data, points, _ = detector.detectAndDecode(img)
+
+    if not data:
+        await message.answer("📷 QR-код не найден на фото")
+        return
+
+    # ожидаем формат user:<telegram_id>
+    if not data.startswith("user:"):
+        await message.answer("⚠ QR-код не является кодом пользователя")
+        return
+
+    try:
+        tg_id = int(data.split(":", 1)[1])
+    except ValueError:
+        await message.answer("❌ Некорректные данные в QR-коде")
+        return
+
+    # --- ищем пользователя ---
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(
+            select(User).where(User.telegram_id == tg_id)
+        )
+        user = result.scalar_one_or_none()
+
+    if not user:
+        await message.answer("❌ Пользователь не найден в базе")
+        return
+
+    text = (
+        f"👤 *Пользователь найден!*\n\n"
+        f"ID: {user.id}\n"
+        f"Telegram ID: {user.telegram_id}\n"
+        f"Имя: {user.first_name} {user.last_name or ''}\n"
+        f"Телефон: {user.phone or '-'}\n"
+        f"Баланс: {user.balance}\n"
+    )
+
+    await message.answer(
+        text,
+        parse_mode="Markdown",
+        reply_markup=admin_user_actions_kb(user.id),
+    )
