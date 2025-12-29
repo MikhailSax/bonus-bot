@@ -1,0 +1,120 @@
+# src/handlers/admin/posts.py
+
+from aiogram import Router, F
+from aiogram.types import CallbackQuery, Message
+from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import StatesGroup, State
+from aiogram.exceptions import TelegramForbiddenError, TelegramBadRequest
+from sqlalchemy import select
+
+from src.database import AsyncSessionLocal
+from src.models.user import User
+from src.keyboards.admin_kb import admin_back_kb, admin_main_menu_kb
+
+router = Router()
+
+
+class AdminPostFSM(StatesGroup):
+    text = State()
+    media = State()
+
+
+@router.callback_query(F.data == "admin_post_create")
+async def admin_post_create(callback: CallbackQuery, state: FSMContext, is_admin: bool):
+    if not is_admin:
+        return await callback.answer("⛔ У вас нет доступа!", show_alert=True)
+
+    await state.clear()
+    await state.set_state(AdminPostFSM.text)
+    await callback.message.edit_text(
+        "📝 Введите текст поста:",
+        reply_markup=admin_back_kb("admin_post_cancel"),
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data == "admin_post_cancel")
+async def admin_post_cancel(callback: CallbackQuery, state: FSMContext, is_admin: bool):
+    if not is_admin:
+        return await callback.answer("⛔ У вас нет доступа!", show_alert=True)
+
+    await state.clear()
+    await callback.message.edit_text("⚙ Админ-панель", reply_markup=admin_main_menu_kb())
+    await callback.answer()
+
+
+@router.message(AdminPostFSM.text)
+async def admin_post_text(message: Message, state: FSMContext, is_admin: bool):
+    if not is_admin:
+        await state.clear()
+        return await message.answer("⛔ У вас нет доступа!")
+
+    if not message.text or not message.text.strip():
+        return await message.answer("Введите текст поста.")
+
+    await state.update_data(text=message.text.strip())
+    await state.set_state(AdminPostFSM.media)
+    await message.answer(
+        "📎 Теперь отправьте фото или медиафайл для поста:",
+        reply_markup=admin_back_kb("admin_post_cancel"),
+    )
+
+
+@router.message(AdminPostFSM.media)
+async def admin_post_media(message: Message, state: FSMContext, is_admin: bool):
+    if not is_admin:
+        await state.clear()
+        return await message.answer("⛔ У вас нет доступа!")
+
+    data = await state.get_data()
+    text = data.get("text")
+    if not text:
+        await state.clear()
+        return await message.answer("Текст поста не найден. Попробуйте снова.")
+
+    media_type = None
+    file_id = None
+
+    if message.photo:
+        media_type = "photo"
+        file_id = message.photo[-1].file_id
+    elif message.video:
+        media_type = "video"
+        file_id = message.video.file_id
+    elif message.animation:
+        media_type = "animation"
+        file_id = message.animation.file_id
+    elif message.document:
+        media_type = "document"
+        file_id = message.document.file_id
+
+    if not file_id:
+        return await message.answer("Отправьте фото или медиафайл (видео/гиф/документ).")
+
+    async with AsyncSessionLocal() as session:
+        users = (await session.execute(select(User.telegram_id))).scalars().all()
+
+    sent = 0
+    failed = 0
+
+    for tg_id in users:
+        try:
+            if media_type == "photo":
+                await message.bot.send_photo(tg_id, file_id, caption=text)
+            elif media_type == "video":
+                await message.bot.send_video(tg_id, file_id, caption=text)
+            elif media_type == "animation":
+                await message.bot.send_animation(tg_id, file_id, caption=text)
+            else:
+                await message.bot.send_document(tg_id, file_id, caption=text)
+            sent += 1
+        except (TelegramForbiddenError, TelegramBadRequest):
+            failed += 1
+
+    await state.clear()
+    await message.answer(
+        "✅ Пост разослан!\n"
+        f"Отправлено: {sent}\n"
+        f"Ошибки: {failed}",
+        reply_markup=admin_main_menu_kb(),
+    )

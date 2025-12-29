@@ -31,6 +31,7 @@ from src.handlers.admin.bonuses import router as admin_bonuses_router
 from src.handlers.admin.holidays import router as admin_holidays_router
 from src.handlers.admin.qr_scan import router as admin_qr_router
 from src.handlers.admin.stats import router as admin_stats_router
+from src.handlers.admin.posts import router as admin_posts_router
 
 # --- SERVICES ---
 from src.services.holiday_bonus_service import HolidayBonusService
@@ -154,6 +155,7 @@ async def main():
     dp.include_router(admin_holidays_router)
     dp.include_router(admin_qr_router)
     dp.include_router(admin_stats_router)
+    dp.include_router(admin_posts_router)
 
     # Start polling
     await bot.delete_webhook(drop_pending_updates=True)

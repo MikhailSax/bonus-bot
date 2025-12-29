@@ -6,6 +6,7 @@ from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 # -------------------------------------------------------------------
 def admin_main_menu_kb():
     kb = [
+        [InlineKeyboardButton(text="📝 Создать пост", callback_data="admin_post_create")],
         [InlineKeyboardButton(text="👥 Пользователи", callback_data="admin_users")],
         [InlineKeyboardButton(text="🎁 Бонусы", callback_data="admin_bonuses")],
         [InlineKeyboardButton(text="📅 Праздники", callback_data="admin_holidays")],
