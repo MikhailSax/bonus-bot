@@ -95,6 +95,8 @@ async def admin_bonus_add(callback: CallbackQuery, state: FSMContext):
 @router.message(BonusFSM.add)
 async def admin_bonus_add_finish(message: Message, state: FSMContext):
     try:
+        if message.text is None:
+            raise ValueError
         amount = int(message.text)
         if amount <= 0:
             raise ValueError
@@ -149,6 +151,8 @@ async def admin_bonus_sub(callback: CallbackQuery, state: FSMContext):
 @router.message(BonusFSM.subtract)
 async def admin_bonus_sub_finish(message: Message, state: FSMContext):
     try:
+        if message.text is None:
+            raise ValueError
         amount = int(message.text)
         if amount <= 0:
             raise ValueError
@@ -211,6 +215,8 @@ async def admin_bonus_percent(callback: CallbackQuery, state: FSMContext):
 @router.message(BonusFSM.percent)
 async def admin_bonus_percent_finish(message: Message, state: FSMContext):
     try:
+        if message.text is None:
+            raise ValueError
         purchase_amount = float(message.text.replace(",", "."))
         if purchase_amount <= 0:
             raise ValueError
