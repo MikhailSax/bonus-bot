@@ -37,7 +37,9 @@ class EditBalanceFSM(StatesGroup):
 @router.callback_query(F.data == "admin_users")
 async def admin_users_list(callback: CallbackQuery):
     async with AsyncSessionLocal() as session:
-        users = (await session.execute(select(User))).scalars().all()
+        users = (
+            await session.execute(select(User).order_by(User.id).limit(200))
+        ).scalars().all()
 
     if not users:
         return await callback.message.edit_text(
@@ -48,6 +50,9 @@ async def admin_users_list(callback: CallbackQuery):
     text = "👥 Список пользователей:\n\n"
     for u in users:
         text += f"ID: {u.id} | 💳 Баланс: {u.balance} | @{u.username or '-'}\n"
+
+    if len(users) == 200:
+        text += "\nПоказаны первые 200 пользователей."
 
     await callback.message.edit_text(
         text,
