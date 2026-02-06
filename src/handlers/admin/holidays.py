@@ -11,6 +11,7 @@ from datetime import datetime, timedelta
 from src.database import AsyncSessionLocal
 from src.models.holiday_bonus import HolidayBonus, UserHolidayBonus
 from src.models.user import User
+from src.services.holiday_bonus_service import HolidayBonusService
 from src.keyboards.admin_kb import (
     admin_back_kb,
     admin_holiday_actions_kb,
@@ -145,7 +146,7 @@ async def holiday_set_amount(message: Message, state: FSMContext):
 
 
 # =====================================================
-# Удаление праздника
+# Отключение праздника
 # =====================================================
 
 @router.callback_query(F.data.startswith("holiday_delete:"))
@@ -163,10 +164,12 @@ async def holiday_delete(callback: CallbackQuery):
             await callback.answer("Ошибка: праздник не найден", show_alert=True)
             return
 
-        await session.delete(holiday)
+        holiday.is_active = False
+        holiday_service = HolidayBonusService(session)
+        await holiday_service.expire_holiday_bonuses_for_holiday(holiday.id)
         await session.commit()
 
-    await callback.message.edit_text("🗑 Праздник удалён!")
+    await callback.message.edit_text("🗑 Праздник отключён, бонусы списаны.")
     await callback.answer()
 
 
