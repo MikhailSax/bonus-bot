@@ -192,6 +192,9 @@ class HolidayBonusService:
             if bonus.amount == 0:
                 bonus.is_active = False
 
+        if used > 0:
+            await self.session.flush()
+
         return used
 
     # ------------------------------------------------------------------
