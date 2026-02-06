@@ -197,6 +197,56 @@ class HolidayBonusService:
 
         return used
 
+    async def expire_holiday_bonuses_for_holiday(self, holiday_id: int) -> int:
+        """
+        Списывает активные бонусы, выданные за конкретный праздник.
+        Возвращает количество обработанных бонусов.
+        """
+        if self.session is None:
+            raise RuntimeError(
+                "HolidayBonusService(expire_holiday_bonuses_for_holiday) требует AsyncSession. "
+                "Создавай через HolidayBonusService(session)."
+            )
+
+        now = datetime.now()
+
+        stmt = select(UserHolidayBonus).where(
+            UserHolidayBonus.holiday_id == holiday_id,
+            UserHolidayBonus.is_active == True,
+            UserHolidayBonus.expires_at != None,
+            UserHolidayBonus.expires_at > now,
+        )
+        res = await self.session.execute(stmt)
+        bonuses = res.scalars().all()
+
+        processed = 0
+
+        for bonus in bonuses:
+            user = await self.session.get(User, bonus.user_id)
+            if not user:
+                bonus.is_active = False
+                processed += 1
+                continue
+
+            to_sub = min(user.balance, bonus.amount)
+            if to_sub > 0:
+                user.balance -= to_sub
+                self.session.add(
+                    Transaction(
+                        user_id=user.id,
+                        amount=-to_sub,
+                        description=(
+                            f"Отмена праздничного бонуса "
+                            f"({bonus.holiday.name if bonus.holiday else 'Праздник'})"
+                        ),
+                    )
+                )
+
+            bonus.is_active = False
+            processed += 1
+
+        return processed
+
     # ------------------------------------------------------------------
     # Внутренние методы
     # ------------------------------------------------------------------
