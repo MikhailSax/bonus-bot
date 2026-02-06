@@ -1,3 +1,4 @@
+import asyncio
 from io import BytesIO
 
 import numpy as np
@@ -11,6 +12,16 @@ from src.models.user import User
 from src.keyboards.admin_kb import admin_user_actions_kb
 
 router = Router()
+
+def _decode_qr_code(image_bytes: bytes) -> str | None:
+    file_bytes = np.asarray(bytearray(image_bytes), dtype=np.uint8)
+    img = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
+    if img is None:
+        return None
+
+    detector = cv2.QRCodeDetector()
+    data, _, _ = detector.detectAndDecode(img)
+    return data or None
 
 
 @router.message(F.photo | F.document)
@@ -35,14 +46,9 @@ async def scan_qr_code(message: Message):
 
     bio = BytesIO()
     await message.bot.download(file, destination=bio)
-    bio.seek(0)
+    image_bytes = bio.getvalue()
 
-    # --- читаем картинку в OpenCV ---
-    file_bytes = np.asarray(bytearray(bio.read()), dtype=np.uint8)
-    img = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
-
-    detector = cv2.QRCodeDetector()
-    data, points, _ = detector.detectAndDecode(img)
+    data = await asyncio.to_thread(_decode_qr_code, image_bytes)
 
     if not data:
         await message.answer("📷 QR-код не найден на фото")

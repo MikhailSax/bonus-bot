@@ -1,5 +1,7 @@
 # src/handlers/admin/posts.py
 
+import asyncio
+
 from aiogram import Router, F
 from aiogram.types import CallbackQuery, Message
 from aiogram.fsm.context import FSMContext
@@ -17,6 +19,45 @@ router = Router()
 class AdminPostFSM(StatesGroup):
     text = State()
     media = State()
+
+
+async def _send_post_media(bot, tg_id: int, media_type: str, file_id: str, text: str) -> bool:
+    try:
+        if media_type == "photo":
+            await bot.send_photo(tg_id, file_id, caption=text)
+        elif media_type == "video":
+            await bot.send_video(tg_id, file_id, caption=text)
+        elif media_type == "animation":
+            await bot.send_animation(tg_id, file_id, caption=text)
+        else:
+            await bot.send_document(tg_id, file_id, caption=text)
+        return True
+    except (TelegramForbiddenError, TelegramBadRequest):
+        return False
+
+
+async def _broadcast_post(bot, chat_id: int, users: list[int], media_type: str, file_id: str, text: str):
+    semaphore = asyncio.Semaphore(20)
+
+    async def _guarded_send(tg_id: int) -> bool:
+        async with semaphore:
+            return await _send_post_media(bot, tg_id, media_type, file_id, text)
+
+    results = await asyncio.gather(
+        *(_guarded_send(tg_id) for tg_id in users),
+        return_exceptions=False,
+    )
+
+    sent = sum(1 for ok in results if ok)
+    failed = len(results) - sent
+
+    await bot.send_message(
+        chat_id,
+        "✅ Пост разослан!\n"
+        f"Отправлено: {sent}\n"
+        f"Ошибки: {failed}",
+        reply_markup=admin_main_menu_kb(),
+    )
 
 
 @router.callback_query(F.data == "admin_post_create")
@@ -94,27 +135,16 @@ async def admin_post_media(message: Message, state: FSMContext, is_admin: bool):
     async with AsyncSessionLocal() as session:
         users = (await session.execute(select(User.telegram_id))).scalars().all()
 
-    sent = 0
-    failed = 0
-
-    for tg_id in users:
-        try:
-            if media_type == "photo":
-                await message.bot.send_photo(tg_id, file_id, caption=text)
-            elif media_type == "video":
-                await message.bot.send_video(tg_id, file_id, caption=text)
-            elif media_type == "animation":
-                await message.bot.send_animation(tg_id, file_id, caption=text)
-            else:
-                await message.bot.send_document(tg_id, file_id, caption=text)
-            sent += 1
-        except (TelegramForbiddenError, TelegramBadRequest):
-            failed += 1
-
     await state.clear()
-    await message.answer(
-        "✅ Пост разослан!\n"
-        f"Отправлено: {sent}\n"
-        f"Ошибки: {failed}",
-        reply_markup=admin_main_menu_kb(),
+    await message.answer("📤 Рассылка запущена, результат придет отдельным сообщением.")
+
+    asyncio.create_task(
+        _broadcast_post(
+            message.bot,
+            message.chat.id,
+            users,
+            media_type,
+            file_id,
+            text,
+        )
     )
