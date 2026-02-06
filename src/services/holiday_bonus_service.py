@@ -148,6 +148,52 @@ class HolidayBonusService:
             for b in bonuses
         ]
 
+    async def apply_holiday_bonus_spend(self, user_id: int, amount: int) -> int:
+        """
+        Списывает сумму из активных праздничных бонусов пользователя.
+        Возвращает сколько списали из праздничных бонусов.
+        """
+        if self.session is None:
+            raise RuntimeError(
+                "HolidayBonusService(apply_holiday_bonus_spend) требует AsyncSession. "
+                "Создавай через HolidayBonusService(session)."
+            )
+
+        if amount <= 0:
+            return 0
+
+        now = datetime.now()
+
+        stmt = (
+            select(UserHolidayBonus)
+            .where(
+                UserHolidayBonus.user_id == user_id,
+                UserHolidayBonus.is_active == True,
+                UserHolidayBonus.expires_at != None,
+                UserHolidayBonus.expires_at > now,
+            )
+            .order_by(UserHolidayBonus.expires_at)
+        )
+        res = await self.session.execute(stmt)
+        bonuses = res.scalars().all()
+
+        remaining = amount
+        used = 0
+
+        for bonus in bonuses:
+            if remaining <= 0:
+                break
+
+            use_amount = min(remaining, bonus.amount)
+            bonus.amount -= use_amount
+            remaining -= use_amount
+            used += use_amount
+
+            if bonus.amount == 0:
+                bonus.is_active = False
+
+        return used
+
     # ------------------------------------------------------------------
     # Внутренние методы
     # ------------------------------------------------------------------

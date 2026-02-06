@@ -9,6 +9,7 @@ from sqlalchemy import select
 
 from src.database import AsyncSessionLocal
 from src.models.user import User
+from src.services.holiday_bonus_service import HolidayBonusService
 from src.keyboards.admin_kb import (
     admin_back_to_users_kb,
     admin_user_actions_kb,
@@ -166,6 +167,9 @@ async def admin_bonus_sub_finish(message: Message, state: FSMContext):
             return await message.answer(
                 "❌ Недостаточно бонусов для списания!"
             )
+
+        holiday_service = HolidayBonusService(session)
+        await holiday_service.apply_holiday_bonus_spend(user.id, amount)
 
         user.balance -= amount
         await session.commit()

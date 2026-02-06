@@ -13,7 +13,7 @@ from src.keyboards.admin_kb import admin_user_actions_kb
 router = Router()
 
 
-@router.message(F.photo)
+@router.message(F.photo | F.document)
 async def scan_qr_code(message: Message):
     # --- проверяем, что это админ ---
     async with AsyncSessionLocal() as session:
@@ -25,11 +25,16 @@ async def scan_qr_code(message: Message):
     if not admin or admin.role != "admin":
         return  # игнорируем, если не админ
 
-    # --- берём самое большое фото ---
-    photo = message.photo[-1]
+    if message.photo:
+        file = message.photo[-1]
+    elif message.document and message.document.mime_type and message.document.mime_type.startswith("image/"):
+        file = message.document
+    else:
+        await message.answer("📷 Пришлите изображение с QR-кодом.")
+        return
 
     bio = BytesIO()
-    await message.bot.download(photo, destination=bio)
+    await message.bot.download(file, destination=bio)
     bio.seek(0)
 
     # --- читаем картинку в OpenCV ---
