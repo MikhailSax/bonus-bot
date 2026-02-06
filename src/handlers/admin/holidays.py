@@ -6,6 +6,7 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.context import FSMContext
 
 from sqlalchemy import select
+from datetime import datetime, timedelta
 
 from src.database import AsyncSessionLocal
 from src.models.holiday_bonus import HolidayBonus, UserHolidayBonus
@@ -193,11 +194,17 @@ async def holiday_give(callback: CallbackQuery):
         for user in users:
             user.balance += holiday.amount
 
+            expires_at = None
+            if holiday.days_valid is not None:
+                expires_at = datetime.now() + timedelta(days=holiday.days_valid)
+
             session.add(
                 UserHolidayBonus(
                     user_id=user.id,
                     holiday_id=holiday.id,
                     amount=holiday.amount,
+                    expires_at=expires_at,
+                    is_active=True,
                 )
             )
 

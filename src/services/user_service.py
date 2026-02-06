@@ -183,7 +183,8 @@ class UserService:
                     "id": b.id,
                     "amount": b.amount,
                     "expires_at": b.expires_at.strftime("%d.%m.%Y"),
-                    "days_left": (b.expires_at - now).days
+                    "days_left": (b.expires_at - now).days,
+                    "holiday": b.holiday.name if b.holiday else "День рождения",
                 })
 
         return {
