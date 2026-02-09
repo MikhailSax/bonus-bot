@@ -238,6 +238,7 @@ class HolidayBonusService:
                     Transaction(
                         user_id=user.id,
                         amount=-to_sub,
+                        operation_type="subtract",
                         description=(
                             f"Отмена праздничного бонуса "
                             f"({bonus.holiday.name if bonus.holiday else 'Праздник'})"
@@ -273,6 +274,7 @@ class HolidayBonusService:
                     Transaction(
                         user_id=user.id,
                         amount=-to_sub,
+                        operation_type="subtract",
                         description=(
                             f"Сгорание праздничного бонуса "
                             f"({b.holiday.name if b.holiday else 'День рождения'})"
@@ -326,6 +328,7 @@ class HolidayBonusService:
             Transaction(
                 user_id=user.id,
                 amount=amount,
+                operation_type="add",
                 description="Праздничный бонус ко дню рождения",
             )
         )
@@ -387,6 +390,7 @@ class HolidayBonusService:
                 Transaction(
                     user_id=user.id,
                     amount=amount,
+                    operation_type="add",
                     description=f"Праздничный бонус: {holiday.name}",
                 )
             )
