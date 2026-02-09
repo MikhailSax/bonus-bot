@@ -1,14 +1,24 @@
 # src/database/session.py
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
+import os
 from contextlib import asynccontextmanager
+
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 
 # Используем SQLite
 DATABASE_URL = "sqlite+aiosqlite:///./bonus_bot.db"
 
+def _parse_bool(value: str | None) -> bool:
+    if value is None:
+        return False
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+SQLALCHEMY_ECHO = _parse_bool(os.getenv("SQLALCHEMY_ECHO"))
+
 # Создаем асинхронный движок
 engine = create_async_engine(
     DATABASE_URL,
-    echo=True,
+    echo=SQLALCHEMY_ECHO,
     connect_args={"check_same_thread": False}
 )
 
