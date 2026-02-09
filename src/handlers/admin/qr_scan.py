@@ -5,7 +5,7 @@ import numpy as np
 import cv2
 from aiogram import Router, F
 from aiogram.types import Message
-from aiogram.filters import StateFilter
+from aiogram.fsm.context import FSMContext
 from sqlalchemy import select
 
 from src.database import AsyncSessionLocal
@@ -14,6 +14,7 @@ from src.keyboards.admin_kb import admin_user_actions_kb
 from src.handlers.admin.posts import AdminPostFSM
 
 router = Router()
+
 
 def _decode_qr_code(image_bytes: bytes) -> str | None:
     file_bytes = np.asarray(bytearray(image_bytes), dtype=np.uint8)
@@ -26,11 +27,12 @@ def _decode_qr_code(image_bytes: bytes) -> str | None:
     return data or None
 
 
-@router.message(
-    F.photo | F.document,
-    ~StateFilter(AdminPostFSM.text, AdminPostFSM.media),
-)
-async def scan_qr_code(message: Message):
+@router.message(F.photo | F.document)
+async def scan_qr_code(message: Message, state: FSMContext):
+    current_state = await state.get_state()
+    if current_state in {AdminPostFSM.text.state, AdminPostFSM.media.state}:
+        return
+
     # --- проверяем, что это админ ---
     async with AsyncSessionLocal() as session:
         result = await session.execute(
@@ -43,7 +45,11 @@ async def scan_qr_code(message: Message):
 
     if message.photo:
         file = message.photo[-1]
-    elif message.document and message.document.mime_type and message.document.mime_type.startswith("image/"):
+    elif (
+        message.document
+        and message.document.mime_type
+        and message.document.mime_type.startswith("image/")
+    ):
         file = message.document
     else:
         await message.answer("📷 Пришлите изображение с QR-кодом.")
