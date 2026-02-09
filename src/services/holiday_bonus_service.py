@@ -7,6 +7,7 @@ from typing import Optional, List, Dict
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 
 from src.database import AsyncSessionLocal
 from src.models.user import User
@@ -128,11 +129,15 @@ class HolidayBonusService:
         await self.session.commit()
 
         # Собираем активные праздничные бонусы
-        stmt = select(UserHolidayBonus).where(
-            UserHolidayBonus.user_id == user.id,
-            UserHolidayBonus.is_active == True,
-            UserHolidayBonus.expires_at != None,
-            UserHolidayBonus.expires_at > now,
+        stmt = (
+            select(UserHolidayBonus)
+            .options(selectinload(UserHolidayBonus.holiday))
+            .where(
+                UserHolidayBonus.user_id == user.id,
+                UserHolidayBonus.is_active == True,
+                UserHolidayBonus.expires_at != None,
+                UserHolidayBonus.expires_at > now,
+            )
         )
         res = await self.session.execute(stmt)
         bonuses = res.scalars().all()
@@ -213,11 +218,15 @@ class HolidayBonusService:
 
         now = datetime.now()
 
-        stmt = select(UserHolidayBonus).where(
-            UserHolidayBonus.holiday_id == holiday_id,
-            UserHolidayBonus.is_active == True,
-            UserHolidayBonus.expires_at != None,
-            UserHolidayBonus.expires_at > now,
+        stmt = (
+            select(UserHolidayBonus)
+            .options(selectinload(UserHolidayBonus.holiday))
+            .where(
+                UserHolidayBonus.holiday_id == holiday_id,
+                UserHolidayBonus.is_active == True,
+                UserHolidayBonus.expires_at != None,
+                UserHolidayBonus.expires_at > now,
+            )
         )
         res = await self.session.execute(stmt)
         bonuses = res.scalars().all()
@@ -256,11 +265,15 @@ class HolidayBonusService:
     # ------------------------------------------------------------------
     async def _expire_old_bonuses(self, user: User, now: datetime):
         """Сжигаем просроченные праздничные бонусы и уменьшаем баланс."""
-        stmt = select(UserHolidayBonus).where(
-            UserHolidayBonus.user_id == user.id,
-            UserHolidayBonus.is_active == True,
-            UserHolidayBonus.expires_at != None,
-            UserHolidayBonus.expires_at <= now,
+        stmt = (
+            select(UserHolidayBonus)
+            .options(selectinload(UserHolidayBonus.holiday))
+            .where(
+                UserHolidayBonus.user_id == user.id,
+                UserHolidayBonus.is_active == True,
+                UserHolidayBonus.expires_at != None,
+                UserHolidayBonus.expires_at <= now,
+            )
         )
         res = await self.session.execute(stmt)
         expired = res.scalars().all()
