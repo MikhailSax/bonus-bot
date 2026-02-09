@@ -1,9 +1,11 @@
 # src/handlers/admin/posts.py
 
 import asyncio
+from io import BytesIO
+from typing import Literal
 
 from aiogram import Router, F
-from aiogram.types import CallbackQuery, Message
+from aiogram.types import CallbackQuery, Message, BufferedInputFile
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
 from aiogram.exceptions import TelegramForbiddenError, TelegramBadRequest
@@ -21,27 +23,51 @@ class AdminPostFSM(StatesGroup):
     media = State()
 
 
-async def _send_post_media(bot, tg_id: int, media_type: str, file_id: str, text: str) -> bool:
+FileSource = str | tuple[bytes, str]
+
+
+def _build_input_file(file_source: FileSource) -> str | BufferedInputFile:
+    if isinstance(file_source, tuple):
+        file_bytes, filename = file_source
+        return BufferedInputFile(file_bytes, filename=filename)
+    return file_source
+
+
+async def _send_post_media(
+    bot,
+    tg_id: int,
+    media_type: Literal["photo", "video", "animation", "document"],
+    file_source: FileSource,
+    text: str,
+) -> bool:
     try:
+        input_file = _build_input_file(file_source)
         if media_type == "photo":
-            await bot.send_photo(tg_id, file_id, caption=text)
+            await bot.send_photo(tg_id, input_file, caption=text)
         elif media_type == "video":
-            await bot.send_video(tg_id, file_id, caption=text)
+            await bot.send_video(tg_id, input_file, caption=text)
         elif media_type == "animation":
-            await bot.send_animation(tg_id, file_id, caption=text)
+            await bot.send_animation(tg_id, input_file, caption=text)
         else:
-            await bot.send_document(tg_id, file_id, caption=text)
+            await bot.send_document(tg_id, input_file, caption=text)
         return True
     except (TelegramForbiddenError, TelegramBadRequest):
         return False
 
 
-async def _broadcast_post(bot, chat_id: int, users: list[int], media_type: str, file_id: str, text: str):
+async def _broadcast_post(
+    bot,
+    chat_id: int,
+    users: list[int],
+    media_type: Literal["photo", "video", "animation", "document"],
+    file_source: FileSource,
+    text: str,
+):
     semaphore = asyncio.Semaphore(20)
 
     async def _guarded_send(tg_id: int) -> bool:
         async with semaphore:
-            return await _send_post_media(bot, tg_id, media_type, file_id, text)
+            return await _send_post_media(bot, tg_id, media_type, file_source, text)
 
     results = await asyncio.gather(
         *(_guarded_send(tg_id) for tg_id in users),
@@ -96,7 +122,7 @@ async def admin_post_text(message: Message, state: FSMContext, is_admin: bool):
     await state.update_data(text=message.text.strip())
     await state.set_state(AdminPostFSM.media)
     await message.answer(
-        "📎 Теперь отправьте фото или медиафайл для поста:",
+        "📎 Теперь отправьте фото или медиафайл для поста (фото/видео лучше отправлять не как файл):",
         reply_markup=admin_back_kb("admin_post_cancel"),
     )
 
@@ -114,22 +140,37 @@ async def admin_post_media(message: Message, state: FSMContext, is_admin: bool):
         return await message.answer("Текст поста не найден. Попробуйте снова.")
 
     media_type = None
-    file_id = None
+    file_source = None
 
     if message.photo:
         media_type = "photo"
-        file_id = message.photo[-1].file_id
+        file_source = message.photo[-1].file_id
     elif message.video:
         media_type = "video"
-        file_id = message.video.file_id
+        file_source = message.video.file_id
     elif message.animation:
         media_type = "animation"
-        file_id = message.animation.file_id
+        file_source = message.animation.file_id
     elif message.document:
-        media_type = "document"
-        file_id = message.document.file_id
+        mime_type = message.document.mime_type or ""
+        if mime_type.startswith("image/"):
+            media_type = "animation" if mime_type == "image/gif" else "photo"
+        elif mime_type.startswith("video/"):
+            media_type = "video"
+        else:
+            media_type = "document"
 
-    if not file_id:
+        if media_type == "document":
+            file_source = message.document.file_id
+        else:
+            bio = BytesIO()
+            await message.bot.download(message.document, destination=bio)
+            file_source = (
+                bio.getvalue(),
+                message.document.file_name or "media",
+            )
+
+    if not file_source:
         return await message.answer("Отправьте фото или медиафайл (видео/гиф/документ).")
 
     async with AsyncSessionLocal() as session:
@@ -144,7 +185,7 @@ async def admin_post_media(message: Message, state: FSMContext, is_admin: bool):
             message.chat.id,
             users,
             media_type,
-            file_id,
+            file_source,
             text,
         )
     )

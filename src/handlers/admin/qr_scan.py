@@ -5,11 +5,13 @@ import numpy as np
 import cv2
 from aiogram import Router, F
 from aiogram.types import Message
+from aiogram.filters import StateFilter
 from sqlalchemy import select
 
 from src.database import AsyncSessionLocal
 from src.models.user import User
 from src.keyboards.admin_kb import admin_user_actions_kb
+from src.handlers.admin.posts import AdminPostFSM
 
 router = Router()
 
@@ -24,7 +26,10 @@ def _decode_qr_code(image_bytes: bytes) -> str | None:
     return data or None
 
 
-@router.message(F.photo | F.document)
+@router.message(
+    F.photo | F.document,
+    ~StateFilter(AdminPostFSM.text, AdminPostFSM.media),
+)
 async def scan_qr_code(message: Message):
     # --- проверяем, что это админ ---
     async with AsyncSessionLocal() as session:
