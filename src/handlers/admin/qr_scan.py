@@ -6,6 +6,7 @@ import cv2
 from aiogram import Router, F
 from aiogram.types import Message
 from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import StatesGroup, State
 from sqlalchemy import select
 
 from src.database import AsyncSessionLocal
@@ -14,6 +15,10 @@ from src.keyboards.admin_kb import admin_user_actions_kb
 from src.handlers.admin.posts import AdminPostFSM
 
 router = Router()
+
+
+class QrScanFSM(StatesGroup):
+    waiting = State()
 
 
 def _decode_qr_code(image_bytes: bytes) -> str | None:
@@ -106,4 +111,3 @@ async def scan_qr_code(message: Message, state: FSMContext):
     )
 
     await state.clear()
-
