@@ -15,6 +15,7 @@ from src.handlers.admin.posts import AdminPostFSM
 
 router = Router()
 
+
 def _decode_qr_code(image_bytes: bytes) -> str | None:
     file_bytes = np.asarray(bytearray(image_bytes), dtype=np.uint8)
     img = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
@@ -31,6 +32,7 @@ async def scan_qr_code(message: Message, state: FSMContext):
     current_state = await state.get_state()
     if current_state in {AdminPostFSM.text.state, AdminPostFSM.media.state}:
         return
+
     # --- проверяем, что это админ ---
     async with AsyncSessionLocal() as session:
         result = await session.execute(
@@ -43,7 +45,11 @@ async def scan_qr_code(message: Message, state: FSMContext):
 
     if message.photo:
         file = message.photo[-1]
-    elif message.document and message.document.mime_type and message.document.mime_type.startswith("image/"):
+    elif (
+        message.document
+        and message.document.mime_type
+        and message.document.mime_type.startswith("image/")
+    ):
         file = message.document
     else:
         await message.answer("📷 Пришлите изображение с QR-кодом.")
