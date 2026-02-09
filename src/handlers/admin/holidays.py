@@ -146,7 +146,7 @@ async def holiday_set_amount(message: Message, state: FSMContext):
 
 
 # =====================================================
-# Отключение праздника
+# Удаление праздника
 # =====================================================
 
 @router.callback_query(F.data.startswith("holiday_delete:"))
@@ -164,12 +164,12 @@ async def holiday_delete(callback: CallbackQuery):
             await callback.answer("Ошибка: праздник не найден", show_alert=True)
             return
 
-        holiday.is_active = False
         holiday_service = HolidayBonusService(session)
         await holiday_service.expire_holiday_bonuses_for_holiday(holiday.id)
+        await session.delete(holiday)
         await session.commit()
 
-    await callback.message.edit_text("🗑 Праздник отключён, бонусы списаны.")
+    await callback.message.edit_text("🗑 Праздник удалён, бонусы списаны.")
     await callback.answer()
 
 
