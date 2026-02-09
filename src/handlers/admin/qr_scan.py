@@ -101,3 +101,5 @@ async def scan_qr_code(message: Message, state: FSMContext):
         parse_mode="Markdown",
         reply_markup=admin_user_actions_kb(user.id),
     )
+
+    await state.clear()
