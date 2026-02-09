@@ -37,13 +37,18 @@ async def user_balance(message: Message):
             await session.refresh(user)
 
             balance = user.balance
+            holiday_balance = user.holiday_balance
             holiday_info = await user_service.get_user_holiday_bonuses_info(user.id)
 
     except SQLAlchemyError:
         await message.answer("❌ Ошибка обращения к базе. Сообщите администратору.")
         return
 
-    text_lines = [f"💰 Ваш баланс: *{balance}* бонусов"]
+    text_lines = [
+        f"💰 Обычные бонусы: *{balance}*",
+        f"🎉 Праздничные бонусы: *{holiday_balance}*",
+        f"💎 Всего бонусов: *{balance + holiday_balance}*",
+    ]
 
     if holiday_info["total"]:
         text_lines.append("")

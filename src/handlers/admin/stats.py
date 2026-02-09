@@ -12,7 +12,9 @@ router = Router()
 async def admin_stats(callback: CallbackQuery):
     async with AsyncSessionLocal() as session:
         total_users = await session.scalar(select(func.count(User.id)))
-        total_balance = await session.scalar(select(func.sum(User.balance)))
+        total_balance = await session.scalar(
+            select(func.sum(User.balance + User.holiday_balance))
+        )
         total_trx = await session.scalar(select(func.count(Transaction.id)))
 
     text = (

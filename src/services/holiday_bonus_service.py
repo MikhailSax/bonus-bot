@@ -193,6 +193,9 @@ class HolidayBonusService:
                 bonus.is_active = False
 
         if used > 0:
+            user = await self.session.get(User, user_id)
+            if user:
+                user.holiday_balance = max((user.holiday_balance or 0) - used, 0)
             await self.session.flush()
 
         return used
@@ -228,9 +231,9 @@ class HolidayBonusService:
                 processed += 1
                 continue
 
-            to_sub = min(user.balance, bonus.amount)
+            to_sub = min(user.holiday_balance, bonus.amount)
             if to_sub > 0:
-                user.balance -= to_sub
+                user.holiday_balance -= to_sub
                 self.session.add(
                     Transaction(
                         user_id=user.id,
@@ -263,9 +266,9 @@ class HolidayBonusService:
 
         for b in expired:
             # Списываем, но не даём уйти в минус
-            to_sub = min(user.balance, b.amount)
+            to_sub = min(user.holiday_balance, b.amount)
             if to_sub > 0:
-                user.balance -= to_sub
+                user.holiday_balance -= to_sub
                 self.session.add(
                     Transaction(
                         user_id=user.id,
@@ -308,7 +311,7 @@ class HolidayBonusService:
         amount = 500
         expires_at = now + timedelta(days=7)
 
-        user.balance += amount
+        user.holiday_balance += amount
 
         bonus = UserHolidayBonus(
             user_id=user.id,
@@ -369,7 +372,7 @@ class HolidayBonusService:
                 continue  # уже есть
 
             amount = holiday.amount
-            user.balance += amount
+            user.holiday_balance += amount
 
             bonus = UserHolidayBonus(
                 user_id=user.id,

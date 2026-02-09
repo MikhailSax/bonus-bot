@@ -3,6 +3,7 @@
 from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery
 from aiogram.exceptions import TelegramBadRequest
+from aiogram.fsm.context import FSMContext
 
 from src.keyboards.admin_kb import (
     admin_main_menu_kb,
@@ -12,6 +13,7 @@ from src.keyboards.admin_kb import (
 )
 from src.database import AsyncSessionLocal
 from src.models.user import User
+from src.handlers.admin.qr_scan import QrScanFSM
 from sqlalchemy import select, func
 
 router = Router()
@@ -32,7 +34,8 @@ async def open_admin_panel(message: Message, is_admin: bool):
 # Переход в главное меню админа
 # ---------------------------------------------------------
 @router.callback_query(F.data == "admin_menu")
-async def admin_menu(callback: CallbackQuery):
+async def admin_menu(callback: CallbackQuery, state: FSMContext):
+    await state.clear()
     await callback.message.edit_text("⚙ Админ-панель", reply_markup=admin_main_menu_kb())
     await callback.answer()
 
@@ -118,7 +121,8 @@ async def admin_holidays(callback: CallbackQuery):
 # Сканирование QR-кода
 # ---------------------------------------------------------
 @router.callback_query(F.data == "admin_qr_scan")
-async def admin_qr_scan(callback: CallbackQuery):
+async def admin_qr_scan(callback: CallbackQuery, state: FSMContext):
+    await state.set_state(QrScanFSM.waiting)
     await callback.message.edit_text(
         "📷 Отправьте QR-код (фото) для сканирования.\n"
         "После распознавания я покажу данные пользователя.",

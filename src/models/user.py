@@ -28,6 +28,7 @@ class User(Base):
 
     # Баланс
     balance = Column(Integer, default=0)
+    holiday_balance = Column(Integer, default=0)
 
     # Технические поля
     created_at = Column(DateTime, server_default=func.now())
@@ -49,6 +50,10 @@ class User(Base):
 
     def __repr__(self):
         return f"<User {self.telegram_id} ({self.first_name})>"
+
+    @property
+    def total_balance(self) -> int:
+        return (self.balance or 0) + (self.holiday_balance or 0)
 
     # ---------------------------
     #   PROPERTY БЕЗОПАСНЫЕ
