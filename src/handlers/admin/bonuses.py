@@ -53,7 +53,9 @@ async def bonus_back_user(callback: CallbackQuery, state: FSMContext):
         f"Telegram ID: {user.telegram_id}\n"
         f"Имя: {user.first_name or ''} {user.last_name or ''}\n"
         f"Телефон: {user.phone or '-'}\n"
-        f"Баланс: {user.balance}\n"
+        f"Обычные бонусы: {user.balance}\n"
+        f"Праздничные бонусы: {user.holiday_balance}\n"
+        f"Всего бонусов: {user.total_balance}\n"
     )
 
     await callback.message.edit_text(
@@ -167,15 +169,18 @@ async def admin_bonus_sub_finish(message: Message, state: FSMContext):
             await session.execute(select(User).where(User.id == user_id))
         ).scalar_one()
 
-        if user.balance < amount:
+        if user.total_balance < amount:
             return await message.answer(
                 "❌ Недостаточно бонусов для списания!"
             )
 
         holiday_service = HolidayBonusService(session)
-        await holiday_service.apply_holiday_bonus_spend(user.id, amount)
-
-        user.balance -= amount
+        used_holiday = await holiday_service.apply_holiday_bonus_spend(user.id, amount)
+        remaining = amount - used_holiday
+        if remaining > 0:
+            user.balance -= remaining
+            if user.balance < 0:
+                user.balance = 0
         await session.commit()
 
     await message.answer(

@@ -60,6 +60,7 @@ async def user_profile(message: Message, session):
                 pass
 
         balance = getattr(user, "balance", 0)
+        holiday_balance = getattr(user, "holiday_balance", 0)
 
     except SQLAlchemyError:
         await message.answer(
@@ -75,7 +76,9 @@ async def user_profile(message: Message, session):
         f"Телефон: {phone}\n"
         f"Дата рождения: {birth_str}\n"
         f"Возраст: {age_str}\n"
-        f"Баланс: *{balance}* бонусов\n"
+        f"Обычные бонусы: *{balance}*\n"
+        f"Праздничные бонусы: *{holiday_balance}*\n"
+        f"Всего бонусов: *{balance + holiday_balance}*\n"
     )
 
     await message.answer(

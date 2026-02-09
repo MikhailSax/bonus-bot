@@ -195,7 +195,7 @@ async def holiday_give(callback: CallbackQuery):
         users = (await session.execute(select(User))).scalars().all()
 
         for user in users:
-            user.balance += holiday.amount
+            user.holiday_balance += holiday.amount
 
             expires_at = None
             if holiday.days_valid is not None:

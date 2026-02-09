@@ -49,7 +49,10 @@ async def admin_users_list(callback: CallbackQuery):
 
     text = "👥 Список пользователей:\n\n"
     for u in users:
-        text += f"ID: {u.id} | 💳 Баланс: {u.balance} | @{u.username or '-'}\n"
+        text += (
+            f"ID: {u.id} | 💳 Обычные: {u.balance} | "
+            f"🎉 Праздничные: {u.holiday_balance} | @{u.username or '-'}\n"
+        )
 
     if len(users) == 200:
         text += "\nПоказаны первые 200 пользователей."
@@ -80,7 +83,9 @@ async def open_user(callback: CallbackQuery):
         f"Telegram ID: {user.telegram_id}\n"
         f"Имя: {user.first_name} {user.last_name or ''}\n"
         f"Телефон: {user.phone or '-'}\n"
-        f"Баланс: {user.balance}\n"
+        f"Обычные бонусы: {user.balance}\n"
+        f"Праздничные бонусы: {user.holiday_balance}\n"
+        f"Всего бонусов: {user.total_balance}\n"
         f"Роль: {user.role}\n"
     )
 

@@ -34,7 +34,9 @@ async def admin_stats(message: Message):
 
     async with AsyncSessionLocal() as session:
         total_users = await session.scalar(select(func.count(User.id)))
-        total_balance = await session.scalar(select(func.sum(User.balance)))
+        total_balance = await session.scalar(
+            select(func.sum(User.balance + User.holiday_balance))
+        )
 
     total_balance = total_balance or 0
 
@@ -80,8 +82,8 @@ async def add_bonus_cmd(message: Message):
         await message.answer(
             f"✅ Бонусы начислены!\n\n"
             f"👤 {user.first_name}\n"
-            f"💎 Было: {old_balance}\n"
-            f"💎 Стало: {user.balance}"
+            f"💎 Было (обычные): {old_balance}\n"
+            f"💎 Стало (обычные): {user.balance}"
         )
 
 
@@ -123,7 +125,7 @@ async def find_phone_cmd(message: Message):
         text += (
             f"👤 {u.first_name}\n"
             f"📞 {u.phone or 'нет'}\n"
-            f"💎 {u.balance} бонусов\n\n"
+            f"💎 {u.balance} обычных, {u.holiday_balance} праздничных\n\n"
         )
 
     await message.answer(text)
@@ -143,6 +145,6 @@ async def list_users(message: Message):
 
     text = "<b>👥 Список пользователей</b>\n\n"
     for u in users[:30]:
-        text += f"{u.first_name} — {u.balance} 💎\n"
+        text += f"{u.first_name} — {u.balance} обычных, {u.holiday_balance} праздничных 💎\n"
 
     await message.answer(text, reply_markup=admin_main_menu_kb())

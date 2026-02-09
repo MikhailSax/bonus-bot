@@ -29,6 +29,7 @@ def _decode_qr_code(image_bytes: bytes) -> str | None:
 
 @router.message(F.photo | F.document)
 async def scan_qr_code(message: Message, state: FSMContext):
+    # не мешаем созданию постов админом
     current_state = await state.get_state()
     if current_state in {AdminPostFSM.text.state, AdminPostFSM.media.state}:
         return
@@ -93,7 +94,9 @@ async def scan_qr_code(message: Message, state: FSMContext):
         f"Telegram ID: {user.telegram_id}\n"
         f"Имя: {user.first_name} {user.last_name or ''}\n"
         f"Телефон: {user.phone or '-'}\n"
-        f"Баланс: {user.balance}\n"
+        f"Обычные бонусы: {user.balance}\n"
+        f"Праздничные бонусы: {user.holiday_balance}\n"
+        f"Всего бонусов: {user.total_balance}\n"
     )
 
     await message.answer(
@@ -103,3 +106,4 @@ async def scan_qr_code(message: Message, state: FSMContext):
     )
 
     await state.clear()
+

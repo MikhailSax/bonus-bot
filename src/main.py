@@ -10,7 +10,7 @@ from aiogram.types import Message
 from aiogram.filters import Command
 from dotenv import load_dotenv
 
-from sqlalchemy import select
+from sqlalchemy import select, inspect, text
 
 # --- DATABASE ---
 from src.database import AsyncSessionLocal, Base, engine
@@ -95,6 +95,18 @@ async def init_database():
     logger.info("🔄 Создание таблиц...")
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        def _ensure_user_columns(sync_conn):
+            inspector = inspect(sync_conn)
+            columns = {col["name"] for col in inspector.get_columns("users")}
+            if "holiday_balance" not in columns:
+                sync_conn.execute(
+                    text(
+                        "ALTER TABLE users "
+                        "ADD COLUMN holiday_balance INTEGER DEFAULT 0"
+                    )
+                )
+
+        await conn.run_sync(_ensure_user_columns)
     logger.info("✅ Таблицы готовы!")
 
 
