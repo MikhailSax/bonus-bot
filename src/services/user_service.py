@@ -3,6 +3,7 @@
 from datetime import datetime
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 
 from src.models.user import User
 from src.models.holiday_bonus import UserHolidayBonus
@@ -170,7 +171,11 @@ class UserService:
     async def get_user_holiday_bonuses_info(self, user_id: int):
         """Информация о бонусах пользователя"""
 
-        stmt = select(UserHolidayBonus).where(UserHolidayBonus.user_id == user_id)
+        stmt = (
+            select(UserHolidayBonus)
+            .options(selectinload(UserHolidayBonus.holiday))
+            .where(UserHolidayBonus.user_id == user_id)
+        )
         res = await self.session.execute(stmt)
         bonuses = res.scalars().all()
 
