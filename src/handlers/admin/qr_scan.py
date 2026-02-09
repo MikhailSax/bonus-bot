@@ -5,6 +5,8 @@ import numpy as np
 import cv2
 from aiogram import Router, F
 from aiogram.types import Message
+from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import StatesGroup, State
 from sqlalchemy import select
 
 from src.database import AsyncSessionLocal
@@ -12,6 +14,11 @@ from src.models.user import User
 from src.keyboards.admin_kb import admin_user_actions_kb
 
 router = Router()
+
+
+class QrScanFSM(StatesGroup):
+    waiting = State()
+
 
 def _decode_qr_code(image_bytes: bytes) -> str | None:
     file_bytes = np.asarray(bytearray(image_bytes), dtype=np.uint8)
@@ -24,8 +31,8 @@ def _decode_qr_code(image_bytes: bytes) -> str | None:
     return data or None
 
 
-@router.message(F.photo | F.document)
-async def scan_qr_code(message: Message):
+@router.message(QrScanFSM.waiting, F.photo | F.document)
+async def scan_qr_code(message: Message, state: FSMContext):
     # --- проверяем, что это админ ---
     async with AsyncSessionLocal() as session:
         result = await session.execute(
@@ -90,3 +97,9 @@ async def scan_qr_code(message: Message):
         parse_mode="Markdown",
         reply_markup=admin_user_actions_kb(user.id),
     )
+    await state.clear()
+
+
+@router.message(QrScanFSM.waiting)
+async def qr_scan_invalid(message: Message):
+    await message.answer("📷 Пришлите изображение с QR-кодом.")
