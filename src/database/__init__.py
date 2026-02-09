@@ -34,7 +34,13 @@ def _ensure_user_columns(sync_conn):
 
 async def ensure_schema():
     """Проверить и обновить схему без миграций (SQLite)."""
+    from src.models.user import User
+    from src.models.transaction import Transaction
+    from src.models.admin_action import AdminAction
+    from src.models.holiday_bonus import HolidayBonus, UserHolidayBonus
+
     async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
         await conn.run_sync(_ensure_user_columns)
         await conn.execute(
             text(
