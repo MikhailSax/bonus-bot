@@ -168,6 +168,7 @@ async def confirm_balance_edit(callback: CallbackQuery, state: FSMContext):
         tr = Transaction(
             user_id=user.id,
             amount=amount if "add" in action else -amount,
+            operation_type="add" if "add" in action else "subtract",
             description="Admin operation"
         )
         session.add(tr)

@@ -29,6 +29,7 @@ class BonusService:
             tr = Transaction(
                 user_id=user.id,
                 amount=amount,
+                operation_type="add",
                 description=description
             )
             session.add(tr)
@@ -60,6 +61,7 @@ class BonusService:
             tr = Transaction(
                 user_id=user.id,
                 amount=-amount,
+                operation_type="subtract",
                 description=description
             )
             session.add(tr)
