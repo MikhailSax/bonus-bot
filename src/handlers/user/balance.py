@@ -5,7 +5,7 @@ from aiogram.types import Message
 from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 
-from src.database import AsyncSessionLocal
+from src.database import AsyncSessionLocal, ensure_schema
 from src.models.user import User
 from src.models.transaction import Transaction
 from src.services.user_service import UserService
@@ -20,6 +20,7 @@ router = Router()
 @router.message(F.text == "💰 Мой баланс")
 async def user_balance(message: Message):
     try:
+        await ensure_schema()
         async with AsyncSessionLocal() as session:
             # находим пользователя по telegram_id
             result = await session.execute(
