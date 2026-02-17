@@ -7,6 +7,7 @@ from aiogram import Router, F
 from aiogram.types import Message
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
+from aiogram.dispatcher.event.bases import SkipHandler
 from sqlalchemy import select
 
 from src.database import AsyncSessionLocal
@@ -37,7 +38,7 @@ async def scan_qr_code(message: Message, state: FSMContext):
     # не мешаем созданию постов админом
     current_state = await state.get_state()
     if current_state in {AdminPostFSM.text.state, AdminPostFSM.media.state}:
-        return
+        raise SkipHandler()
 
     # --- проверяем, что это админ ---
     async with AsyncSessionLocal() as session:
@@ -47,7 +48,7 @@ async def scan_qr_code(message: Message, state: FSMContext):
         admin = result.scalar_one_or_none()
 
     if not admin or admin.role != "admin":
-        return  # игнорируем, если не админ
+        raise SkipHandler()  # игнорируем, если не админ
 
     if message.photo:
         file = message.photo[-1]
@@ -58,8 +59,7 @@ async def scan_qr_code(message: Message, state: FSMContext):
     ):
         file = message.document
     else:
-        await message.answer("📷 Пришлите изображение с QR-кодом.")
-        return
+        raise SkipHandler()
 
     bio = BytesIO()
     await message.bot.download(file, destination=bio)
