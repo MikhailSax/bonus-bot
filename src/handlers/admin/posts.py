@@ -26,6 +26,41 @@ class AdminPostFSM(StatesGroup):
 FileSource = str | tuple[bytes, str]
 
 
+async def _extract_media_from_message(message: Message) -> tuple[str | None, FileSource | None]:
+    media_type = None
+    file_source = None
+
+    if message.photo:
+        media_type = "photo"
+        file_source = message.photo[-1].file_id
+    elif message.video:
+        media_type = "video"
+        file_source = message.video.file_id
+    elif message.animation:
+        media_type = "animation"
+        file_source = message.animation.file_id
+    elif message.document:
+        mime_type = message.document.mime_type or ""
+        if mime_type.startswith("image/"):
+            media_type = "animation" if mime_type == "image/gif" else "photo"
+        elif mime_type.startswith("video/"):
+            media_type = "video"
+        else:
+            media_type = "document"
+
+        if media_type == "document":
+            file_source = message.document.file_id
+        else:
+            bio = BytesIO()
+            await message.bot.download(message.document, destination=bio)
+            file_source = (
+                bio.getvalue(),
+                message.document.file_name or "media",
+            )
+
+    return media_type, file_source
+
+
 def _build_input_file(file_source: FileSource) -> str | BufferedInputFile:
     if isinstance(file_source, tuple):
         file_bytes, filename = file_source
@@ -86,6 +121,31 @@ async def _broadcast_post(
     )
 
 
+async def _run_broadcast(
+    message: Message,
+    state: FSMContext,
+    text: str,
+    media_type: Literal["photo", "video", "animation", "document"],
+    file_source: FileSource,
+):
+    async with AsyncSessionLocal() as session:
+        users = (await session.execute(select(User.telegram_id))).scalars().all()
+
+    await state.clear()
+    await message.answer("📤 Рассылка запущена, результат придет отдельным сообщением.")
+
+    asyncio.create_task(
+        _broadcast_post(
+            message.bot,
+            message.chat.id,
+            users,
+            media_type,
+            file_source,
+            text,
+        )
+    )
+
+
 @router.callback_query(F.data == "admin_post_create")
 async def admin_post_create(callback: CallbackQuery, state: FSMContext, is_admin: bool):
     if not is_admin:
@@ -116,10 +176,15 @@ async def admin_post_text(message: Message, state: FSMContext, is_admin: bool):
         await state.clear()
         return await message.answer("⛔ У вас нет доступа!")
 
-    if not message.text or not message.text.strip():
+    text = (message.text or message.caption or "").strip()
+    if not text:
         return await message.answer("Введите текст поста.")
 
-    await state.update_data(text=message.text.strip())
+    media_type, file_source = await _extract_media_from_message(message)
+    if file_source:
+        return await _run_broadcast(message, state, text, media_type, file_source)
+
+    await state.update_data(text=text)
     await state.set_state(AdminPostFSM.media)
     await message.answer(
         "📎 Теперь отправьте фото или медиафайл для поста (фото/видео лучше отправлять не как файл):",
@@ -139,53 +204,9 @@ async def admin_post_media(message: Message, state: FSMContext, is_admin: bool):
         await state.clear()
         return await message.answer("Текст поста не найден. Попробуйте снова.")
 
-    media_type = None
-    file_source = None
-
-    if message.photo:
-        media_type = "photo"
-        file_source = message.photo[-1].file_id
-    elif message.video:
-        media_type = "video"
-        file_source = message.video.file_id
-    elif message.animation:
-        media_type = "animation"
-        file_source = message.animation.file_id
-    elif message.document:
-        mime_type = message.document.mime_type or ""
-        if mime_type.startswith("image/"):
-            media_type = "animation" if mime_type == "image/gif" else "photo"
-        elif mime_type.startswith("video/"):
-            media_type = "video"
-        else:
-            media_type = "document"
-
-        if media_type == "document":
-            file_source = message.document.file_id
-        else:
-            bio = BytesIO()
-            await message.bot.download(message.document, destination=bio)
-            file_source = (
-                bio.getvalue(),
-                message.document.file_name or "media",
-            )
+    media_type, file_source = await _extract_media_from_message(message)
 
     if not file_source:
         return await message.answer("Отправьте фото или медиафайл (видео/гиф/документ).")
 
-    async with AsyncSessionLocal() as session:
-        users = (await session.execute(select(User.telegram_id))).scalars().all()
-
-    await state.clear()
-    await message.answer("📤 Рассылка запущена, результат придет отдельным сообщением.")
-
-    asyncio.create_task(
-        _broadcast_post(
-            message.bot,
-            message.chat.id,
-            users,
-            media_type,
-            file_source,
-            text,
-        )
-    )
+    await _run_broadcast(message, state, text, media_type, file_source)
