@@ -377,11 +377,15 @@ class HolidayBonusService:
             year_start = datetime(today.year, 1, 1)
             year_end = datetime(today.year, 12, 31, 23, 59, 59)
 
-            stmt = select(UserHolidayBonus).where(
+            stmt = (
+                select(UserHolidayBonus.id)
+                .where(
                 UserHolidayBonus.user_id == user.id,
                 UserHolidayBonus.holiday_id == holiday.id,
                 UserHolidayBonus.created_at >= year_start,
                 UserHolidayBonus.created_at <= year_end,
+                )
+                .limit(1)
             )
             res = await self.session.execute(stmt)
             if res.scalar_one_or_none():
