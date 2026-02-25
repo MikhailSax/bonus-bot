@@ -1,6 +1,7 @@
 # src/handlers/user/profile.py
 
 from io import BytesIO
+import logging
 
 import qrcode
 from aiogram import Router, F
@@ -13,6 +14,7 @@ from src.services.user_service import UserService
 from src.keyboards.user_kb import get_user_main_menu, get_back_to_menu
 
 router = Router()
+logger = logging.getLogger(__name__)
 
 
 # =========================
@@ -63,6 +65,7 @@ async def user_profile(message: Message, session):
         holiday_balance = getattr(user, "holiday_balance", 0)
 
     except SQLAlchemyError:
+        logger.exception("Ошибка при получении профиля пользователя")
         await message.answer(
             "❌ Ошибка обращения к базе. Сообщите администратору.",
             reply_markup=get_back_to_menu(),
@@ -134,6 +137,7 @@ async def user_qr(message: Message, session):
         )
 
     except SQLAlchemyError:
+        logger.exception("Ошибка при генерации QR-кода пользователя")
         await message.answer(
             "❌ Ошибка обращения к базе. Сообщите администратору.",
             reply_markup=get_back_to_menu(),

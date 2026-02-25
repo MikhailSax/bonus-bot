@@ -1,5 +1,7 @@
 # src/handlers/user/balance.py
 
+import logging
+
 from aiogram import Router, F
 from aiogram.types import Message
 from sqlalchemy import select
@@ -12,6 +14,7 @@ from src.services.user_service import UserService
 from src.keyboards.user_kb import get_user_main_menu, get_back_to_menu
 
 router = Router()
+logger = logging.getLogger(__name__)
 
 
 # =========================
@@ -42,6 +45,7 @@ async def user_balance(message: Message):
             holiday_info = await user_service.get_user_holiday_bonuses_info(user.id)
 
     except SQLAlchemyError:
+        logger.exception("Ошибка при получении баланса пользователя")
         await message.answer("❌ Ошибка обращения к базе. Сообщите администратору.")
         return
 
@@ -97,6 +101,7 @@ async def user_history(message: Message):
             transactions = tr_result.scalars().all()
 
     except SQLAlchemyError:
+        logger.exception("Ошибка при получении истории операций")
         await message.answer("❌ Ошибка при получении истории операций.")
         return
 
