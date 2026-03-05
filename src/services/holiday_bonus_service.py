@@ -120,6 +120,12 @@ class HolidayBonusService:
         # 1. Сжигаем просроченные
         await self._expire_old_bonuses(user, now)
 
+        # На дату регистрации выдаём только приветственные 200 бонусов.
+        # Праздничные начисления (ДР/календарь) начинаем проверять со следующего дня.
+        if user.created_at and user.created_at.date() == now.date():
+            await self.session.commit()
+            return []
+
         # 2. Бонус ко дню рождения
         await self._check_birthday_bonus(user, now)
 
